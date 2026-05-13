@@ -1,0 +1,155 @@
+/* ===================================================
+   Skeleton shimmer
+   =================================================== */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 1.8s infinite linear;
+  display: block;
+}
+
+/* ===================================================
+   Result skeleton
+   =================================================== */
+.result-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6);
+  animation: fadeIn 0.4s ease both;
+}
+
+.result-skeleton__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.result-skeleton__score-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+}
+
+.result-skeleton__divider {
+  height: 1px;
+  background: var(--color-border);
+}
+
+.result-skeleton__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.result-skeleton__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ===================================================
+   Spinner
+   =================================================== */
+.spinner {
+  animation: spin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ===================================================
+   Processing Overlay
+   =================================================== */
+.processing-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  padding: var(--space-12);
+  animation: fadeIn 0.4s ease both;
+}
+
+.processing-overlay__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  text-align: center;
+}
+
+/* Animated rings */
+.processing-rings {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.processing-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  animation: spin linear infinite;
+}
+
+.processing-ring--1 {
+  inset: 0;
+  border-top-color: var(--color-primary);
+  animation-duration: 1.2s;
+}
+
+.processing-ring--2 {
+  inset: 12px;
+  border-right-color: var(--color-secondary);
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+
+.processing-ring--3 {
+  inset: 24px;
+  border-bottom-color: var(--color-accent);
+  animation-duration: 2.4s;
+}
+
+.processing-rings__icon {
+  font-size: 2rem;
+  animation: bounceIn 0.5s ease both;
+}
+
+.processing-overlay__label {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  animation: fadeInUp 0.4s ease both;
+}
+
+/* Progress dots */
+.processing-dots {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.processing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-surface-3);
+  transition: var(--transition-base);
+}
+
+.processing-dot--active {
+  background: var(--color-primary);
+  box-shadow: 0 0 8px rgba(108, 99, 255, 0.5);
+}
+
+.processing-overlay__hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}

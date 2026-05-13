@@ -1,0 +1,151 @@
+/* ===================================================
+   Step Indicator
+   =================================================== */
+.step-indicator {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: var(--space-6) 0;
+  position: relative;
+}
+
+.step-indicator__item {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 260px;
+}
+
+.step-indicator__item:first-child {
+  flex: 0 0 auto;
+}
+.step-indicator__item:last-child {
+  flex: 0 0 auto;
+}
+
+/* Connector line */
+.step-indicator__line {
+  flex: 1;
+  height: 2px;
+  min-width: 40px;
+  border-radius: 2px;
+  transition: background 0.4s ease;
+  margin: 0 var(--space-3);
+  margin-bottom: 28px; /* align with circle center */
+}
+
+.step-indicator__line--filled {
+  background: var(--gradient-primary);
+}
+
+.step-indicator__line--empty {
+  background: var(--color-border);
+}
+
+/* Step wrapper */
+.step-indicator__step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* Circle */
+.step-indicator__circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  transition: var(--transition-base);
+  position: relative;
+}
+
+.step-indicator__step--active .step-indicator__circle {
+  border-color: var(--color-primary);
+  background: rgba(108, 99, 255, 0.15);
+  box-shadow: 0 0 24px rgba(108, 99, 255, 0.4);
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+.step-indicator__step--done .step-indicator__circle {
+  border-color: var(--color-accent);
+  background: rgba(67, 233, 123, 0.15);
+  color: var(--color-accent);
+}
+
+.step-indicator__step--pending .step-indicator__circle {
+  opacity: 0.5;
+}
+
+/* Icons */
+.step-indicator__icon {
+  display: flex;
+  color: var(--color-text-muted);
+  transition: var(--transition-fast);
+}
+
+.step-indicator__step--active .step-indicator__icon {
+  color: var(--color-primary-light);
+}
+
+/* Labels */
+.step-indicator__labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.step-indicator__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: var(--transition-fast);
+}
+
+.step-indicator__step--active .step-indicator__label {
+  color: var(--color-text);
+}
+
+.step-indicator__step--done .step-indicator__label {
+  color: var(--color-accent);
+}
+
+.step-indicator__desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.step-indicator__step--active .step-indicator__desc {
+  color: var(--color-text-muted);
+}
+
+/* ===================================================
+   Responsive
+   =================================================== */
+@media (max-width: 600px) {
+  .step-indicator {
+    gap: var(--space-2);
+  }
+  .step-indicator__circle {
+    width: 38px;
+    height: 38px;
+  }
+  .step-indicator__desc {
+    display: none;
+  }
+  .step-indicator__label {
+    font-size: var(--text-xs);
+  }
+  .step-indicator__line {
+    min-width: 24px;
+    margin: 0 var(--space-2);
+  }
+}

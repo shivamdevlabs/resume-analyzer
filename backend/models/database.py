@@ -18,7 +18,9 @@ _client: Optional[AsyncIOMotorClient] = None
 def get_client() -> AsyncIOMotorClient:
     """Return the shared Motor client (must call connect() first)."""
     if _client is None:
-        raise RuntimeError("MongoDB client not initialized. Call connect() during app startup.")
+        raise RuntimeError(
+            "MongoDB client not initialized. Call connect() during app startup."
+        )
     return _client
 
 
@@ -42,9 +44,15 @@ async def connect():
     # Verify connection is reachable
     try:
         await _client.admin.command("ping")
-        logger.info("✅ MongoDB connected: %s / %s", settings.MONGODB_URI, settings.MONGODB_DB_NAME)
+        logger.info(
+            "✅ MongoDB connected: %s / %s",
+            settings.MONGODB_URI,
+            settings.MONGODB_DB_NAME,
+        )
     except ConnectionFailure as e:
-        logger.warning("⚠️  MongoDB connection failed: %s — running without DB persistence.", e)
+        logger.warning(
+            "⚠️  MongoDB connection failed: %s — running without DB persistence.", e
+        )
 
 
 async def disconnect():

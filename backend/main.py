@@ -65,11 +65,11 @@ app = FastAPI(
 )
 
 # ─────────────────────────────────────────────
-#  CORS — allow the React dev server
+#  CORS — allow the React dev server and Vercel domains
 # ─────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=["*"],  # Allow all origins to prevent Vercel CORS issues
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

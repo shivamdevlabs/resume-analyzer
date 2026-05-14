@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { downloadResumePDF } from '../services/api'
 import { Spinner } from './Loader'
 import './DownloadButton.css'
 
@@ -16,12 +17,13 @@ export default function DownloadButton({ resumeText, resumeId }) {
     try {
       // If backend is available, try fetching a PDF
       if (resumeId) {
-        const res = await fetch(`/api/download/${resumeId}`)
-        if (res.ok) {
-          const blob = await res.blob()
+        try {
+          const blob = await downloadResumePDF(resumeId)
           triggerDownload(blob, `careercraft_resume_${resumeId}.pdf`, 'application/pdf')
           setState('done')
           return
+        } catch (apiErr) {
+          console.warn('PDF download failed, falling back to TXT', apiErr)
         }
       }
 

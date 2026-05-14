@@ -16,10 +16,10 @@ export default function DownloadButton({ resumeText, resumeId }) {
 
     try {
       // If backend is available, try fetching a PDF
-      if (resumeId) {
+      if (resumeText) {
         try {
-          const blob = await downloadResumePDF(resumeId)
-          triggerDownload(blob, `careercraft_resume_${resumeId}.pdf`, 'application/pdf')
+          const blob = await downloadResumePDF(resumeText)
+          triggerDownload(blob, `careercraft_resume.pdf`, 'application/pdf')
           setState('done')
           return
         } catch (apiErr) {

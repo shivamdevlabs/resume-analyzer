@@ -8,15 +8,51 @@ the stored resume text — so download always works.
 
 import io
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from models import database
 from services import pdf_generator
 
+class PDFRequest(BaseModel):
+    resume_text: str
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.post(
+    "/download",
+    summary="Generate PDF statelessly from resume text",
+    response_description="PDF file stream",
+)
+async def download_resume_stateless(request: PDFRequest):
+    """
+    Generate and stream a PDF directly from the provided text.
+    Bypasses MongoDB entirely, preventing download failures if the DB is unreachable.
+    """
+    if not request.resume_text or len(request.resume_text) < 10:
+        raise HTTPException(status_code=400, detail="Invalid resume text.")
+
+    try:
+        pdf_bytes = pdf_generator.generate_pdf(request.resume_text)
+    except Exception as e:
+        logger.error("Stateless PDF generation failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="PDF generation failed. Please try again.",
+        )
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="ATS_Resume.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
+            "Cache-Control": "no-cache",
+        },
+    )
 
 
 @router.get(

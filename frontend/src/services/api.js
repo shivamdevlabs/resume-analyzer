@@ -131,8 +131,8 @@ export async function analyzeResume({ resumeText, jobDescription, resumeFile }) 
 /**
  * Download generated resume as PDF.
  */
-export async function downloadResumePDF(resumeId) {
-  const response = await api.get(`/api/download/${resumeId}`, {
+export async function downloadResumePDF(resumeText) {
+  const response = await api.post(`/api/download`, { resume_text: resumeText }, {
     responseType: 'blob',
   })
   return response.data

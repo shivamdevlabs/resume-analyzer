@@ -1,4 +1,7 @@
 {
   "name": "careercraft",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "scripts": {
+    "build": "rm -rf frontend/node_modules && cd frontend && npm install && npm run build"
+  }
 }

@@ -6,4 +6,4 @@ backend_dir = os.path.join(os.path.dirname(__file__), "..", "backend")
 sys.path.insert(0, backend_dir)
 
 # Import the FastAPI app instance
-from backend.main import app
+from main import app  # type: ignore

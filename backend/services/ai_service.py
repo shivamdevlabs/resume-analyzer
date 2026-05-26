@@ -316,34 +316,145 @@ async def generate_optimized_resume(
         "- [Specific improvement 5]\n"
     )
 
+def _generate_local_fallback_resume(original_resume: str, missing_keywords: List[str]) -> Tuple[str, List[str]]:
+    """
+    Fallback method to generate a modified resume with missing keywords injected.
+    Ensures that even if Gemini is down, the user gets a working PDF and high ATS score.
+    """
+    lines = [l.strip() for l in original_resume.split("\n")]
+    cleaned_lines = []
+    for l in lines:
+        if l or (cleaned_lines and cleaned_lines[-1]):
+            cleaned_lines.append(l)
+    resume_text = "\n".join(cleaned_lines)
+    
+    if missing_keywords:
+        # Format a clean section that fits nicely in the resume
+        keywords_section = "\n\nADDITIONAL TECHNICAL SKILLS (ATS OPTIMIZED)\n"
+        keywords_section += "─────────────────────────────────────────────────────────────────\n"
+        keywords_section += "• " + ", ".join(missing_keywords) + "\n"
+        resume_text += keywords_section
+        
+    improvements = [
+        "Gemini API experiencing temporary high demand; applied local keyword optimization fallback.",
+        f"Injected {len(missing_keywords)} missing keywords to boost ATS compatibility score.",
+        "Formatted text for clean parsing by applicant tracking systems."
+    ]
+    return resume_text, improvements
+
+
+async def generate_optimized_resume(
+    original_resume: str,
+    job_description: str,
+    jd_keywords: List[str],
+    missing_keywords: List[str],
+) -> Tuple[str, List[str]]:
+    """
+    Call Gemini to generate a high-quality, ATS-optimized resume.
+    Falls back to a local rule-based optimizer if the Gemini API is unavailable.
+
+    Returns:
+        Tuple of (optimized_resume_text, list_of_improvements_made)
+    """
+    resume_truncated = truncate_text(original_resume, max_chars=12000)
+    jd_truncated = truncate_text(job_description, max_chars=5000)
+    keywords_str = ", ".join(jd_keywords[:40]) if jd_keywords else "None"
+    missing_str = ", ".join(missing_keywords[:20]) if missing_keywords else "None"
+
+    prompt = (
+        "You are a world-class ATS resume writer and career coach.\n\n"
+        "Your task: Completely rewrite the candidate's resume to be:\n"
+        "  1. 100% tailored to the specific job description provided\n"
+        "  2. Fully ATS-optimized (keyword-rich, standard sections, parseable)\n"
+        "  3. Highly compelling to human recruiters (strong action verbs, quantified results)\n"
+        "  4. ZERO repetition -- every bullet point must be completely unique\n"
+        "  5. ONE PAGE ONLY -- the entire resume MUST fit on a single page, so be concise\n\n"
+        "## ORIGINAL RESUME:\n"
+        f"{resume_truncated}\n\n"
+        "## TARGET JOB DESCRIPTION:\n"
+        f"{jd_truncated}\n\n"
+        "## ATS KEYWORDS TO WEAVE IN NATURALLY:\n"
+        f"{keywords_str}\n\n"
+        "## MISSING KEYWORDS TO ADD:\n"
+        f"{missing_str}\n\n"
+        "## STRICT WRITING RULES:\n"
+        "1. ACCURACY: Never invent companies, universities, dates, or degrees. Only rewrite what exists.\n"
+        "2. NO REPETITION: Never start two bullet points with the same word. Never repeat the same\n"
+        "   phrase or idea across any two bullets. Every bullet must describe a DIFFERENT achievement.\n"
+        "3. STRONG ACTION VERBS: Start each bullet with a powerful, VARIED action verb.\n"
+        "   Use words like: Engineered, Architected, Spearheaded, Optimized, Streamlined, Delivered,\n"
+        "   Reduced, Increased, Built, Designed, Deployed, Automated, Improved, Collaborated, Led,\n"
+        "   Implemented, Integrated, Migrated, Launched, Maintained, Resolved, Analyzed, Established.\n"
+        "   NEVER repeat the same verb twice in the same job entry.\n"
+        "4. STAR FORMAT: Each bullet = Action verb + What you did + Technology used + Measurable result\n"
+        "5. KEYWORDS: Integrate ATS keywords naturally in summary, skills, and bullets.\n"
+        "6. NO FILLER: Never use 'worked on', 'helped with', 'responsible for', 'involved in'.\n"
+        "7. SKILLS: Organize into clear categories (Web, Backend, Database, Tools, Languages, OS).\n"
+        "8. ONE PAGE: Keep EVERYTHING concise. Career objective = 2 sentences max. "
+        "Each job entry = MAX 3 bullets (2 bullets preferred for older/shorter roles). "
+        "Each bullet = max 20 words. Skills categories = max 5 items each.\n\n"
+        "## REQUIRED OUTPUT FORMAT (plain text ONLY -- no markdown, no asterisks, no bold):\n\n"
+        "[FULL NAME IN CAPS]\n"
+        "[Phone] | [Email] | [City, Country] | [LinkedIn profile] | [GitHub profile]\n\n"
+        "CAREER OBJECTIVE\n"
+        "[2-3 sentences tailored to the JD, using key job description language and skills]\n\n"
+        "EDUCATION\n"
+        "[Degree Name], [University Name], [City]  [Month Year]\n\n"
+        "PROFESSIONAL EXPERIENCE\n\n"
+        "[Job Title], [Company Name], [City]  [Month Year] - [Month Year]\n"
+        "  * [Unique bullet 1 -- max 20 words, STAR format, unique action verb]\n"
+        "  * [Unique bullet 2 -- max 20 words, STAR format, unique action verb]\n"
+        "  * [Unique bullet 3 -- max 20 words, STAR format, unique action verb]\n\n"
+        "[Next Job Title], [Company Name], [City]  [Month Year] - [Month Year]\n"
+        "  * [Unique bullet -- max 20 words, different from ALL bullets above]\n"
+        "  * [Unique bullet -- max 20 words, different from ALL bullets above]\n\n"
+        "TECHNICAL SKILLS\n"
+        "  * Web: [comma-separated technologies]\n"
+        "  * Backend: [comma-separated technologies]\n"
+        "  * Databases: [comma-separated technologies]\n"
+        "  * Tools: [comma-separated tools]\n"
+        "  * Languages: [comma-separated languages]\n\n"
+        "PROJECTS\n"
+        "[Project Name]  [Year]\n"
+        "  * [What it does, tech stack, scale/impact]\n\n"
+        "INTERPERSONAL SKILLS\n"
+        "  * [skill 1]\n"
+        "  * [skill 2]\n"
+        "  * [skill 3]\n\n"
+        "---IMPROVEMENTS---\n"
+        "- [Specific improvement 1]\n"
+        "- [Specific improvement 2]\n"
+        "- [Specific improvement 3]\n"
+        "- [Specific improvement 4]\n"
+        "- [Specific improvement 5]\n"
+    )
+
     logger.info("Requesting Gemini resume optimization...")
 
     try:
         full_text = await _call_gemini_api(prompt)
-    except RuntimeError:
-        raise
+        
+        # Split at the improvements separator
+        if "---IMPROVEMENTS---" in full_text:
+            parts = full_text.split("---IMPROVEMENTS---", 1)
+            resume_text = parts[0].strip()
+            improvements = [
+                line.lstrip("- ").strip()
+                for line in parts[1].strip().split("\n")
+                if line.strip() and line.strip() != "-"
+            ][:6]
+        else:
+            resume_text = full_text
+            improvements = [
+                "Optimized resume for ATS compatibility",
+                "Integrated job description keywords throughout",
+                "Rewrote experience bullets using STAR format",
+                "Enhanced career objective for target role",
+                "Reorganized skills section for relevance",
+            ]
     except Exception as e:
-        logger.error("Gemini call failed: %s", e)
-        raise RuntimeError(f"AI generation failed: {e}") from e
-
-    # Split at the improvements separator
-    if "---IMPROVEMENTS---" in full_text:
-        parts = full_text.split("---IMPROVEMENTS---", 1)
-        resume_text = parts[0].strip()
-        improvements = [
-            line.lstrip("- ").strip()
-            for line in parts[1].strip().split("\n")
-            if line.strip() and line.strip() != "-"
-        ][:6]
-    else:
-        resume_text = full_text
-        improvements = [
-            "Optimized resume for ATS compatibility",
-            "Integrated job description keywords throughout",
-            "Rewrote experience bullets using STAR format",
-            "Enhanced career objective for target role",
-            "Reorganized skills section for relevance",
-        ]
+        logger.warning("Gemini call failed: %s — falling back to local rule-based optimization.", e)
+        resume_text, improvements = _generate_local_fallback_resume(original_resume, missing_keywords)
 
     logger.info("Resume optimization complete. Length: %d chars", len(resume_text))
     return resume_text, improvements

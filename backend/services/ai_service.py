@@ -12,6 +12,7 @@ API References:
 """
 
 import logging
+import asyncio
 from typing import List, Tuple, Optional
 
 import httpx
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 _GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
-# Cached model name discovered at first call
-_cached_model: Optional[str] = None
+# Cached model names discovered at first call
+_cached_generative_models: Optional[List[str]] = None
 
 # Preferred model priority -- first one found wins
 _PREFERRED_MODELS = [
@@ -45,17 +46,14 @@ def is_configured() -> bool:
     return bool(settings.GEMINI_API_KEY)
 
 
-async def _discover_model() -> str:
+async def _get_generative_models() -> List[str]:
     """
     Call the Gemini /models endpoint to discover which models are actually
-    available for this API key, then pick the best one.
-
-    This runs once and caches the result -- one extra HTTP call on the very
-    first request, then instant for all subsequent requests.
+    available for this API key, then cache and return the list.
     """
-    global _cached_model
-    if _cached_model:
-        return _cached_model
+    global _cached_generative_models
+    if _cached_generative_models is not None:
+        return _cached_generative_models
 
     if not settings.GEMINI_API_KEY:
         raise RuntimeError(
@@ -111,30 +109,52 @@ async def _discover_model() -> str:
             "Please create a new key at: https://aistudio.google.com/app/apikey"
         )
 
-    for preferred in _PREFERRED_MODELS:
-        if preferred in generative_models:
-            _cached_model = preferred
-            logger.info("Selected Gemini model: %s", _cached_model)
-            return _cached_model
+    _cached_generative_models = generative_models
+    return _cached_generative_models
 
-    _cached_model = generative_models[0]
-    logger.info("Using first available Gemini model: %s", _cached_model)
-    return _cached_model
+
+def _select_model(available_models: List[str], exclude_models: Optional[set] = None) -> str:
+    """Select the best available model, optionally excluding some."""
+    exclude = exclude_models or set()
+    filtered = [m for m in available_models if m not in exclude]
+    if not filtered:
+        raise RuntimeError("No available Gemini models left to try.")
+
+    for preferred in _PREFERRED_MODELS:
+        if preferred in filtered:
+            return preferred
+
+    return filtered[0]
+
+
+async def _discover_model() -> str:
+    """
+    Discover the best available model name for this key.
+    Kept for backwards compatibility with health checks.
+    """
+    models = await _get_generative_models()
+    return _select_model(models)
 
 
 async def _call_gemini_api(prompt: str) -> str:
     """
     Send a prompt to the Gemini REST API and return the generated text.
-
-    Raises:
-        RuntimeError: If the API call fails.
+    Includes fallbacks and retries on transient errors (HTTP 429, 503, 5xx).
     """
-    model_name = await _discover_model()
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError(
+            "GEMINI_API_KEY is missing. Add it to backend/.env\n"
+            "Get a free key at: https://aistudio.google.com/app/apikey"
+        )
+
+    available_models = await _get_generative_models()
+    exclude_models = set()
+    max_attempts = 3
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.55,  # slightly higher for richer vocabulary
+            "temperature": 0.55,
             "topP": 0.95,
             "topK": 64,
             "maxOutputTokens": 8192,
@@ -147,38 +167,68 @@ async def _call_gemini_api(prompt: str) -> str:
         ],
     }
 
-    url = f"{_GEMINI_API_BASE}/models/{model_name}:generateContent"
     params = {"key": settings.GEMINI_API_KEY}
     headers = {"Content-Type": "application/json"}
 
-    logger.info("Calling Gemini model: %s", model_name)
-
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        response = await client.post(url, json=payload, params=params, headers=headers)
-
-    if response.status_code != 200:
-        global _cached_model
-        _cached_model = None
+    for attempt in range(1, max_attempts + 1):
         try:
-            error_detail = (
-                response.json().get("error", {}).get("message", response.text)
-            )
-        except Exception:
-            error_detail = response.text
-        raise RuntimeError(
-            f"Gemini API error (HTTP {response.status_code}): {error_detail}"
-        )
+            model_name = _select_model(available_models, exclude_models)
+        except RuntimeError as e:
+            raise RuntimeError(f"All available Gemini models failed: {e}")
 
-    try:
-        data = response.json()
-        candidates = data.get("candidates", [])
-        if not candidates:
-            raise RuntimeError(
-                "Gemini returned no output. Content may have been blocked by safety filters."
+        url = f"{_GEMINI_API_BASE}/models/{model_name}:generateContent"
+        logger.info("Calling Gemini model: %s (attempt %d/%d)", model_name, attempt, max_attempts)
+
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                response = await client.post(url, json=payload, params=params, headers=headers)
+        except httpx.HTTPError as http_err:
+            logger.warning("HTTP request to model %s failed on attempt %d: %s", model_name, attempt, http_err)
+            if attempt == max_attempts:
+                raise RuntimeError(f"Gemini API communication failed: {http_err}")
+            exclude_models.add(model_name)
+            await asyncio.sleep(1.0 * attempt)
+            continue
+
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    raise RuntimeError(
+                        "Gemini returned no output. Content may have been blocked by safety filters."
+                    )
+                return candidates[0]["content"]["parts"][0]["text"].strip()
+            except (KeyError, IndexError, ValueError) as e:
+                raise RuntimeError(f"Unexpected Gemini response format: {e}") from e
+
+        if response.status_code in (429, 503) or response.status_code >= 500:
+            try:
+                error_detail = response.json().get("error", {}).get("message", response.text)
+            except Exception:
+                error_detail = response.text
+
+            logger.warning(
+                "Gemini model %s returned status %d (attempt %d/%d): %s",
+                model_name, response.status_code, attempt, max_attempts, error_detail
             )
-        return candidates[0]["content"]["parts"][0]["text"].strip()
-    except (KeyError, IndexError) as e:
-        raise RuntimeError(f"Unexpected Gemini response format: {e}") from e
+
+            if attempt == max_attempts:
+                raise RuntimeError(
+                    f"Gemini API error (HTTP {response.status_code}) after {max_attempts} attempts: {error_detail}"
+                )
+
+            exclude_models.add(model_name)
+            await asyncio.sleep(1.5 * attempt)
+            continue
+        else:
+            try:
+                error_detail = response.json().get("error", {}).get("message", response.text)
+            except Exception:
+                error_detail = response.text
+            raise RuntimeError(
+                f"Gemini API error (HTTP {response.status_code}): {error_detail}"
+            )
 
 
 async def generate_optimized_resume(

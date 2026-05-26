@@ -6,21 +6,22 @@ If the PDF wasn't stored in MongoDB, regenerates it on-the-fly from
 the stored resume text — so download always works.
 """
 
-import io
 import logging
-from fastapi import APIRouter, HTTPException, Body
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Body, Response
 from pydantic import BaseModel
 
 from models import database
 from services import pdf_generator
 
+
 class PDFRequest(BaseModel):
     resume_text: str
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
 
 @router.post(
     "/download",
@@ -44,8 +45,8 @@ async def download_resume_stateless(request: PDFRequest):
             detail="PDF generation failed. Please try again.",
         )
 
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": 'attachment; filename="ATS_Resume.pdf"',
@@ -78,8 +79,7 @@ async def download_resume(analysis_id: str):
     except Exception as e:
         logger.error("MongoDB fetch error for id=%s: %s", analysis_id, e)
         raise HTTPException(
-            status_code=503,
-            detail="Database unavailable. Please try again."
+            status_code=503, detail="Database unavailable. Please try again."
         )
 
     if not doc:
@@ -101,7 +101,8 @@ async def download_resume(analysis_id: str):
             )
         logger.info(
             "PDF not stored for %s — regenerating from resume text (%d chars)",
-            analysis_id, len(resume_text),
+            analysis_id,
+            len(resume_text),
         )
         try:
             pdf_bytes = pdf_generator.generate_pdf(resume_text)
@@ -114,11 +115,12 @@ async def download_resume(analysis_id: str):
 
     logger.info(
         "Serving PDF download | id=%s | size=%d bytes",
-        analysis_id, len(pdf_bytes),
+        analysis_id,
+        len(pdf_bytes),
     )
 
-    return StreamingResponse(
-        io.BytesIO(pdf_bytes),
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={
             "Content-Disposition": f'attachment; filename="ATS_Resume_{analysis_id[:8]}.pdf"',

@@ -16,10 +16,13 @@ _client: Optional[AsyncIOMotorClient] = None
 
 
 def get_client() -> AsyncIOMotorClient:
-    """Return the shared Motor client (must call connect() first)."""
+    """Return the shared Motor client, initializing it if necessary."""
+    global _client
     if _client is None:
-        raise RuntimeError(
-            "MongoDB client not initialized. Call connect() during app startup."
+        logger.info("Initializing MongoDB client lazily...")
+        _client = AsyncIOMotorClient(
+            settings.MONGODB_URI,
+            serverSelectionTimeoutMS=5000,
         )
     return _client
 

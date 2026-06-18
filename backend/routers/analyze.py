@@ -12,7 +12,7 @@ Orchestrates the full pipeline:
 """
 
 import logging
-from fastapi import APIRouter, Form, File, UploadFile, HTTPException
+from fastapi import APIRouter, Form, File, UploadFile, HTTPException, Depends
 from typing import Optional
 from datetime import datetime
 
@@ -20,6 +20,7 @@ from models.schemas import AnalyzeResponse
 from models import database
 from services import parser, keyword_extractor, ai_service, scorer, pdf_generator
 from utils.helpers import generate_analysis_id, clean_text
+from routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ async def analyze_resume(
     job_description: str = Form(..., description="Full job description text"),
     resume_text: Optional[str] = Form(None, description="Pasted resume text"),
     resume_file: Optional[UploadFile] = File(None, description="Resume file (PDF/DOCX/TXT)"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Core endpoint: accepts resume (text or file) + job description,
@@ -123,6 +125,7 @@ async def analyze_resume(
             "improvements": improvements,
             "pdf_bytes": pdf_bytes,
             "created_at": datetime.utcnow(),
+            "user_email": current_user["email"],
         }
         await collection.insert_one(doc)
         logger.info("Saved analysis %s to MongoDB", analysis_id)
@@ -141,5 +144,36 @@ async def analyze_resume(
         matched_keywords=matched_keywords,
         total_keywords=total_keywords,
         improvements=improvements,
+        mock=False,
+    )
+
+
+@router.get(
+    "/analysis/{analysis_id}",
+    response_model=AnalyzeResponse,
+    summary="Get saved analysis details by ID",
+)
+async def get_analysis_details(analysis_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Retrieve details of a saved resume analysis by its ID.
+    Enforces that the analysis must belong to the logged-in user.
+    """
+    collection = database.get_analyses_collection()
+    doc = await collection.find_one({"analysis_id": analysis_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Analysis not found.")
+    
+    # Security check: verify ownership
+    if doc.get("user_email") != current_user["email"]:
+        raise HTTPException(status_code=403, detail="Not authorized to view this analysis.")
+        
+    return AnalyzeResponse(
+        success=True,
+        analysis_id=doc["analysis_id"],
+        generated_resume=doc["generated_resume"],
+        ats_score=doc["ats_score"],
+        matched_keywords=doc.get("matched_keywords", []),
+        total_keywords=doc.get("total_keywords", 0),
+        improvements=doc.get("improvements", []),
         mock=False,
     )

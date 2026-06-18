@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from config import settings
 from models import database
 from services import ai_service
-from routers import analyze, download
+from routers import analyze, download, auth
 
 # ─────────────────────────────────────────────
 #  Logging setup
@@ -78,6 +78,7 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 #  Routes
 # ─────────────────────────────────────────────
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(analyze.router, prefix="/api", tags=["Resume Analysis"])
 app.include_router(download.router, prefix="/api", tags=["Download"])
 

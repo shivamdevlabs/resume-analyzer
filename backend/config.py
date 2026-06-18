@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     # --- App ---
     APP_ENV: str = "development"
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    JWT_SECRET: str = "careercraft_super_secret_key_123456"
 
     @property
     def cors_origins_list(self) -> List[str]:

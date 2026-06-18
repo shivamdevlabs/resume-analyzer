@@ -37,6 +37,11 @@ def get_analyses_collection():
     return get_database()["analyses"]
 
 
+def get_users_collection():
+    """Return the 'users' collection."""
+    return get_database()["users"]
+
+
 async def connect():
     """Open the MongoDB connection. Called in FastAPI lifespan startup."""
     global _client

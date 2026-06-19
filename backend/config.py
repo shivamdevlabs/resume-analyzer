@@ -10,7 +10,7 @@ import os
 
 class Settings(BaseSettings):
     # --- Google Gemini ---
-    GEMINI_API_KEY: str = ""
+    GEMINI_API_KEY: str = "AIzaSyB1mPk4Est6_7I8cIjqWEcSJAdc_BtRozc"
 
     # --- MongoDB ---
     MONGODB_URI: str = "mongodb://localhost:27017/"

@@ -8,6 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
 from models import database
 from models.user import (
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 security = HTTPBearer()
+
+
+def _raise_db_unavailable():
+    """Raise a clear 503 error when MongoDB is unreachable."""
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Database is temporarily unavailable. Please check your MONGODB_URI configuration.",
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -93,13 +102,17 @@ async def register(user_data: UserCreate):
     derived_username = email_lower.split("@")[0]
     
     # Check for existing user with same email, username, or mobile number
-    existing_user = await users_col.find_one({
-        "$or": [
-            {"email": email_lower},
-            {"username": derived_username},
-            {"mobile_number": user_data.mobile_number}
-        ]
-    })
+    try:
+        existing_user = await users_col.find_one({
+            "$or": [
+                {"email": email_lower},
+                {"username": derived_username},
+                {"mobile_number": user_data.mobile_number}
+            ]
+        })
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        logger.error("MongoDB unreachable during registration: %s", e)
+        _raise_db_unavailable()
     
     if existing_user:
         if existing_user.get("email") == email_lower:
@@ -131,7 +144,12 @@ async def register(user_data: UserCreate):
         "created_at": datetime.utcnow(),
     }
     
-    await users_col.insert_one(user_doc)
+    try:
+        await users_col.insert_one(user_doc)
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        logger.error("MongoDB unreachable during user insert: %s", e)
+        _raise_db_unavailable()
+
     logger.info("Registered new user: %s (username: %s)", email_lower, derived_username)
     
     # Create token
@@ -158,13 +176,17 @@ async def login(credentials: UserLogin):
     ident = credentials.identifier.strip()
     
     # Match against email, username, or mobile_number
-    user_doc = await users_col.find_one({
-        "$or": [
-            {"email": ident.lower()},
-            {"username": ident},
-            {"mobile_number": ident}
-        ]
-    })
+    try:
+        user_doc = await users_col.find_one({
+            "$or": [
+                {"email": ident.lower()},
+                {"username": ident},
+                {"mobile_number": ident}
+            ]
+        })
+    except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+        logger.error("MongoDB unreachable during login: %s", e)
+        _raise_db_unavailable()
     
     if not user_doc or not verify_password(credentials.password, user_doc["password_hash"]):
         raise HTTPException(

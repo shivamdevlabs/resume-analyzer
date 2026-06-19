@@ -10,10 +10,10 @@ import os
 
 class Settings(BaseSettings):
     # --- Google Gemini ---
-    GEMINI_API_KEY: str = "AIzaSyB1mPk4Est6_7I8cIjqWEcSJAdc_BtRozc"
+    GEMINI_API_KEY: str = ""
 
     # --- MongoDB ---
-    MONGODB_URI: str = "mongodb://localhost:27017/"
+    MONGODB_URI: str = ""
     MONGODB_DB_NAME: str = "careercraft"
 
     # --- App ---
